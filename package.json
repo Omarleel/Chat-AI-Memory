@@ -1,0 +1,48 @@
+{
+  "name": "chat-ai-memory",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Motor local de memoria por contacto y borradores de WhatsApp con RAG, grafo de conocimiento y entrenamiento de identidades",
+  "engines": {
+    "node": ">=26.12.1"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "qrcode": "1.5.4",
+    "qrcode-terminal": "0.12.0",
+    "@langchain/langgraph": "^1.0.0"
+  },
+  "scripts": {
+    "start": "node --env-file=.env src/main.mjs",
+    "dev": "node --watch --env-file=.env src/main.mjs",
+    "import": "node --env-file=.env src/cli.mjs import",
+    "preview": "node --env-file=.env src/cli.mjs preview",
+    "memory:add": "node --env-file=.env src/cli.mjs memory:add",
+    "memory:list": "node --env-file=.env src/cli.mjs memory:list",
+    "contacts": "node --env-file=.env src/cli.mjs contacts",
+    "test": "node --test",
+    "test:unit": "node tests/run-group.mjs unit",
+    "test:integration": "node tests/run-group.mjs integration",
+    "test:python": "python -m pytest -q tests/python",
+    "memory:backfill": "node --env-file=.env src/cli.mjs memory:backfill",
+    "persona:build": "node --env-file=.env src/cli.mjs persona:build",
+    "graph:sync": "node --env-file=.env scripts/ingest_graph.mjs",
+    "evaluate:retrieval": "node --env-file=.env scripts/evaluate_retrieval.mjs",
+    "evaluate:persona": "node --env-file=.env scripts/evaluate_persona_holdout.mjs",
+    "lab:run": "node --env-file=.env scripts/lab.mjs run",
+    "lab:benchmark": "node --env-file=.env scripts/lab.mjs benchmark",
+    "lab:status": "node --env-file=.env scripts/lab.mjs status",
+    "lab:apply": "node --env-file=.env scripts/lab.mjs apply",
+    "lab:dialogues": "node scripts/lab-build-dialogues.mjs",
+    "lab:doctor": "node --env-file=.env scripts/lab.mjs doctor",
+    "diagnose:replies": "node scripts/diagnose-replies.mjs",
+    "evaluate:holdout-replies": "node --env-file=.env scripts/evaluate-reply-holdout.mjs",
+    "training:runner": "node --env-file=.env scripts/training-runner.mjs",
+    "ui:dev": "npm --prefix ui run dev",
+    "ui:build": "npm --prefix ui run build",
+    "test:ui": "npm --prefix ui test",
+    "evaluate:reviewer": "node --env-file=.env scripts/reviewer-benchmark.mjs",
+    "calibrate:reviewer": "node --env-file=.env scripts/reviewer-calibration.mjs"
+  }
+}

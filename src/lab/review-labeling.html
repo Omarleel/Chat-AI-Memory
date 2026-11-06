@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Etiquetado de borradores</title>
+<!-- Página local y sin red: los datos del holdout no salen del equipo. -->
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--text:#1d1d1b;--muted:#6b6b66;--line:#deded8;--accent:#2f6fde;--peer:#ececE6;--self:#dcebff;--ok:#1f8a4c;--bad:#c0392b}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--card:#20201e;--text:#ecece8;--muted:#a0a09a;--line:#363633;--accent:#7aa7ff;--peer:#2b2b28;--self:#22344f;--ok:#4cc27e;--bad:#ff7a6b}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}h1{font-size:20px;margin:8px 0}.muted{color:var(--muted);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}
+.msg{padding:6px 10px;border-radius:8px;margin:4px 0;white-space:pre-wrap;max-width:85%}.peer{background:var(--peer)}.self{background:var(--self);margin-left:auto}
+.who{font-size:11px;color:var(--muted)}.last{outline:2px solid var(--accent)}
+.draft{white-space:pre-wrap;background:var(--self);padding:10px 12px;border-radius:10px;border:2px dashed var(--accent);margin:10px 0 10px auto;max-width:85%}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px}
+button{font:inherit;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
+button.on{border-color:var(--accent);background:var(--accent);color:#fff}button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+input[type=text]{flex:1;min-width:12rem;font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text)}
+nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}.progress{height:6px;background:var(--line);border-radius:3px;overflow:hidden}.progress div{height:100%;background:var(--ok)}
+kbd{font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>¿Este mensaje es una respuesta válida?</h1>
+<p class="muted">Carga <code>items.json</code>. Algunos mensajes son respuestas reales y otros borradores del bot, mezclados. Juzga solo si el mensaje marcado es una respuesta aceptable de esta persona en ese momento. No abras <code>key.json</code> hasta exportar.</p>
+<div class="row"><input type="file" id="file" accept="application/json"><button id="export" class="primary">Exportar labels.json</button></div>
+<div id="app"></div>
+</main>
+<script>
+const LABELS=[['valid','Válida','1'],['invents','Inventa o afirma algo falso','2'],['incoherent','No responde / incoherente','3'],['voice','Tiene sentido pero no suena a él','4']];
+const state={data:null,i:0,labels:{},key:'review-labels'};
+const fingerprint=d=>{let h=5381;for(const ch of JSON.stringify(d.items.map(x=>[x.itemId,x.text])))h=(h*33^ch.charCodeAt(0))>>>0;return 'review-labels:'+h.toString(36);};
+const store={get(){try{return JSON.parse(localStorage.getItem(state.key)||'null')}catch{return null}},set(v){try{localStorage.setItem(state.key,JSON.stringify(v))}catch{}}};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function save(){store.set(state.labels);}
+function render(){
+  const app=document.getElementById('app'),d=state.data;if(!d){app.innerHTML='';return;}
+  const x=d.items[state.i],l=state.labels[x.itemId]||{};
+  const done=Object.values(state.labels).filter(v=>v.label).length;
+  const thread=x.thread.map(m=>`<div class="msg ${m.who===d.self?'self':'peer'}"><div class="who">${esc(m.who)}</div>${esc(m.text)}</div>`).join('');
+  app.innerHTML=`<div class="progress"><div style="width:${Math.round(100*done/d.items.length)}%"></div></div>
+  <p class="muted">${state.i+1} de ${d.items.length} · etiquetados ${done}</p>
+  <div class="card">${thread}<div class="msg peer last"><div class="who">${esc(d.peer)} (último mensaje)</div>${esc(x.lastMessage)}</div>
+  <div class="who" style="text-align:right">Respuesta a juzgar, como ${esc(d.self)}</div><div class="draft">${esc(x.text)}</div>
+  <div class="row">${LABELS.map(([k,t,key])=>`<button data-l="${k}" class="${l.label===k?'on':''}">${t} <kbd>${key}</kbd></button>`).join('')}</div>
+  <div class="row" style="margin-top:8px"><input type="text" id="note" placeholder="Nota opcional (qué inventa, por qué no encaja…)" value="${esc(l.note||'')}"></div></div>
+  <nav><button id="prev">← Anterior</button><button id="next">Siguiente →</button><button id="nextOpen">Siguiente sin etiquetar</button></nav>`;
+  app.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>setLabel(b.dataset.l));
+  document.getElementById('note').oninput=e=>{state.labels[x.itemId]={...state.labels[x.itemId],note:e.target.value};save();};
+  document.getElementById('prev').onclick=()=>{state.i=Math.max(0,state.i-1);render();};
+  document.getElementById('next').onclick=()=>{state.i=Math.min(d.items.length-1,state.i+1);render();};
+  document.getElementById('nextOpen').onclick=()=>{const j=d.items.findIndex((y,k)=>k>state.i&&!state.labels[y.itemId]?.label);if(j>=0){state.i=j;render();}};
+}
+function setLabel(label){const x=state.data.items[state.i];state.labels[x.itemId]={...state.labels[x.itemId],label};save();
+  if(state.i<state.data.items.length-1)state.i++;render();}
+document.addEventListener('keydown',e=>{if(!state.data||e.target.tagName==='INPUT')return;const m=LABELS.find(l=>l[2]===e.key);if(m)setLabel(m[0]);
+  if(e.key==='ArrowRight'){state.i=Math.min(state.data.items.length-1,state.i+1);render();}if(e.key==='ArrowLeft'){state.i=Math.max(0,state.i-1);render();}});
+document.getElementById('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;state.data=JSON.parse(await f.text());state.key=fingerprint(state.data);
+  state.labels=store.get()||{};state.i=Math.max(0,state.data.items.findIndex(x=>!state.labels[x.itemId]?.label));render();};
+document.getElementById('export').onclick=()=>{if(!state.data)return;
+  const labels=state.data.items.filter(x=>state.labels[x.itemId]?.label).map(x=>({itemId:x.itemId,...state.labels[x.itemId]}));
+  const blob=new Blob([JSON.stringify({set:state.key,labels},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='labels.json';a.click();};
+</script>
+</body>
+</html>

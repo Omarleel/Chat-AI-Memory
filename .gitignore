@@ -1,0 +1,57 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+
+# Python Virtual Environments & Cache
+.venv/
+.venv*/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Machine Learning & Fine-tuning artifacts
+*.gguf
+lora_output/
+merged_model/
+scripts/llama_cpp/
+.cache/
+
+# Databases & Runtime State
+data/
+*.sqlite
+*.sqlite-*
+
+# WhatsApp Sessions
+wa-session/
+auth_info_baileys/
+
+# Python
+__pycache__/
+*.pyc
+
+# Coverage & Tests
+coverage/
+.nyc_output/
+/work/
+*.zip
+
+# Imports
+imports/*
+!imports/.gitkeep
+
+# System & OS
+.DS_Store
+Thumbs.db
+
+# Interfaz compilada servida por FastAPI
+api/static/

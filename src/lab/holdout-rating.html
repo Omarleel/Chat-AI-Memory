@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revisión ciega</title>
+<!-- Página local y sin red: los datos del holdout no salen del equipo. -->
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--text:#1d1d1b;--muted:#6b6b66;--line:#deded8;--accent:#2f6fde;--peer:#ececE6;--self:#dcebff}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--card:#20201e;--text:#ecece8;--muted:#a0a09a;--line:#363633;--accent:#7aa7ff;--peer:#2b2b28;--self:#22344f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}h1{font-size:20px;margin:8px 0}p.muted,.muted{color:var(--muted);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}
+.msg{padding:6px 10px;border-radius:8px;margin:4px 0;white-space:pre-wrap;max-width:85%}.peer{background:var(--peer)}.self{background:var(--self);margin-left:auto}
+.who{font-size:11px;color:var(--muted)}.last{border:2px solid var(--accent)}
+.cand{border-top:1px solid var(--line);padding:10px 0}.cand .text{white-space:pre-wrap;background:var(--self);padding:6px 10px;border-radius:8px;margin-bottom:6px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px}button{font:inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<main>
+<h1>Revisión ciega de borradores</h1>
+<p class="muted">Carga <code>blind.json</code>. Para cada candidato marca si es coherente y cuánto suena a la persona (1–5). Después elige cuál crees que es el mensaje real. No abras <code>blind-key.json</code> hasta exportar.</p>
+<div class="row"><input type="file" id="file" accept="application/json"><button id="export" class="primary">Exportar ratings.json</button></div>
+<div id="app"></div>
+</main>
+<script>
+const state={data:null,i:0,ratings:{},picks:{},key:'holdout'};
+const fingerprint=d=>{let h=5381;for(const ch of JSON.stringify(d.cases.map(c=>[c.caseId,c.candidates.map(x=>x.text)])))h=(h*33^ch.charCodeAt(0))>>>0;return 'holdout-ratings:'+h.toString(36);};
+const store={get(){try{return JSON.parse(localStorage.getItem(state.key)||'null')}catch{return null}},set(v){try{localStorage.setItem(state.key,JSON.stringify(v))}catch{}}};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function save(){store.set({ratings:state.ratings,picks:state.picks});}
+function render(){
+  const app=document.getElementById('app');const d=state.data;if(!d){app.innerHTML='';return;}
+  const c=d.cases[state.i];
+  const thread=c.thread.map(m=>`<div class="msg ${m.who===d.self?'self':'peer'}"><div class="who">${esc(m.who)}</div>${esc(m.text)}</div>`).join('');
+  const cands=c.candidates.map(x=>{const k=c.caseId+':'+x.label,r=state.ratings[k]||{};
+    return `<div class="cand"><div class="who">Candidato ${x.label}</div><div class="text">${esc(x.text)}</div><div class="row">
+      <label>Coherente <select data-k="${k}" data-f="coherent"><option value="">–</option><option value="true" ${r.coherent===true?'selected':''}>sí</option><option value="false" ${r.coherent===false?'selected':''}>no</option></select></label>
+      <label>Suena a ${esc(d.self)} <select data-k="${k}" data-f="style"><option value="">–</option>${[1,2,3,4,5].map(n=>`<option ${r.style===n?'selected':''}>${n}</option>`).join('')}</select></label>
+      <label><input type="radio" name="pick" value="${x.label}" ${state.picks[c.caseId]===x.label?'checked':''}> Es el real</label></div></div>`;}).join('');
+  app.innerHTML=`<nav><button id="prev">←</button><span>Caso ${state.i+1} de ${d.cases.length}</span><button id="next">→</button></nav>
+    <div class="card">${thread}<div class="msg peer last"><div class="who">${esc(d.peer)} · último mensaje</div>${esc(c.lastMessage)}</div></div>
+    <div class="card">${cands}</div>`;
+  app.querySelectorAll('select').forEach(s=>s.onchange=()=>{const k=s.dataset.k;state.ratings[k]=state.ratings[k]||{};
+    state.ratings[k][s.dataset.f]=s.value===''?undefined:(s.dataset.f==='style'?Number(s.value):s.value==='true');save();});
+  app.querySelectorAll('input[name=pick]').forEach(r=>r.onchange=()=>{state.picks[c.caseId]=r.value;save();});
+  document.getElementById('prev').onclick=()=>{state.i=Math.max(0,state.i-1);render();};
+  document.getElementById('next').onclick=()=>{state.i=Math.min(d.cases.length-1,state.i+1);render();};
+}
+document.getElementById('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;
+  state.data=JSON.parse(await f.text());state.key=fingerprint(state.data);state.ratings={};state.picks={};const saved=store.get();if(saved){state.ratings=saved.ratings||{};state.picks=saved.picks||{};}state.i=0;render();};
+document.getElementById('export').onclick=()=>{
+  const ratings=Object.entries(state.ratings).map(([k,v])=>{const [caseId,label]=k.split(':');return {caseId,label,...v};});
+  const picks=Object.entries(state.picks).map(([caseId,label])=>({caseId,label}));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({ratings,picks},null,2)],{type:'application/json'}));
+  a.download='ratings.json';a.click();};
+</script>
+</body>
+</html>

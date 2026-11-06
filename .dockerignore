@@ -1,0 +1,28 @@
+.git
+.env
+node_modules
+coverage
+data
+imports
+*.sqlite
+*.sqlite-*
+*.zip
+wa-session/
+auth_info_baileys/
+
+# Python & LoRA
+.venv/
+.venv*/
+venv/
+env/
+__pycache__/
+.pytest_cache/
+tests/
+*.gguf
+lora_output/
+merged_model/
+
+# Interfaz: dependencias y compilación se generan dentro de la imagen
+**/node_modules
+ui/dist
+api/static

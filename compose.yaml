@@ -1,0 +1,107 @@
+name: chat-ai-memory
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      DB_PATH: /app/data/memory.sqlite
+      UPLOAD_DIR: /uploads
+      MEMORY_BACKEND: qdrant
+      WA_WEB_AUTH_DIR: /app/data/wa-session
+      QDRANT_URL: http://qdrant:6333
+      OLLAMA_URL: http://ollama:11434
+      NEO4J_URL: http://neo4j:7474
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-secretpassword}
+    ports:
+      # Only localhost can access the admin API. Publish /webhook via a separate HTTPS reverse proxy.
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    volumes:
+      - sqlite_data:/app/data
+      - ./imports:/imports:ro
+      - ./src:/app/src:ro
+      - ./scripts:/app/scripts:ro
+      - chat_uploads:/uploads:ro
+    depends_on:
+      - qdrant
+      - ollama
+      - neo4j
+    networks: [backend]
+    security_opt: [no-new-privileges:true]
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_URL: http://app:3000
+      UPLOAD_DIR: /uploads
+    ports:
+      # Swagger y API administrativa solo en el equipo local; no abrir a Internet.
+      - "127.0.0.1:${FASTAPI_PORT:-8000}:8000"
+    volumes:
+      - chat_uploads:/uploads
+    depends_on:
+      - app
+    networks: [backend]
+    security_opt: [no-new-privileges:true]
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?Define QDRANT_API_KEY in .env}
+    ports:
+      # Bind localhost only; no direct access from the internet.
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks: [backend]
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    networks: [backend]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  neo4j:
+    image: neo4j:5-community
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-secretpassword}
+      NEO4J_dbms_memory_heap_initial__size: 256m
+      NEO4J_dbms_memory_heap_max__size: 512m
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    volumes:
+      - neo4j_data:/data
+    networks: [backend]
+
+volumes:
+  sqlite_data:
+  chat_uploads:
+  qdrant_data:
+  ollama_models:
+  neo4j_data:
+
+networks:
+  backend:
+    driver: bridge
